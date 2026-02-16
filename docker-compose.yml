@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fm-sync-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fm_sync
+      POSTGRES_PASSWORD: fm_sync_dev
+      POSTGRES_DB: fm_sync
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fm_sync -d fm_sync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Services will be added as we build them:
+  # blackbaud-poller, hubspot-poller, processor, hubspot-worker, frontend
+
+volumes:
+  postgres_data:

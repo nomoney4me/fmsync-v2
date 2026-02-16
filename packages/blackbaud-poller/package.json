@@ -1,0 +1,24 @@
+{
+  "name": "@fm-sync/blackbaud-poller",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "auth": "tsx src/auth-server.ts",
+    "test:fetch-page": "tsx test/fetch-page.ts",
+    "test:fetch-candidate": "tsx test/fetch-candidate-checklist.ts",
+    "test:fetch-candidates": "tsx test/fetch-candidates.ts"
+  },
+  "dependencies": {
+    "@fm-sync/shared": "*",
+    "dotenv": "^16.3.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "fm-sync",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "pg": "^8.11.0"
+  },
+  "scripts": {
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "node infrastructure/db/run-migrations.js",
+    "dev:blackbaud": "npm run dev -w @fm-sync/blackbaud-poller",
+    "bb:auth": "npm run auth -w @fm-sync/blackbaud-poller",
+    "dev:hubspot-poller": "npm run dev -w @fm-sync/hubspot-poller",
+    "dev:processor": "npm run dev -w @fm-sync/processor",
+    "dev:worker": "npm run dev -w @fm-sync/hubspot-worker",
+    "dev:frontend": "npm run dev -w @fm-sync/frontend",
+    "test:fetch-page": "npx tsx packages/blackbaud-poller/test/fetch-page.ts","test:fetch-candidate": "npx tsx packages/blackbaud-poller/test/fetch-candidate-checklist.ts",
+    "test:fetch-candidates": "npm run test:fetch-candidates -w @fm-sync/blackbaud-poller"
+  },
+  "dependencies": {
+    "node-cron": "^4.2.1"
+  }
+}

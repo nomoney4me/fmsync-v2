@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage / Substage Lookup</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #18181c;
+      --border: #2a2a30;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --accent: #a78bfa;
+      --success: #34d399;
+      --warning: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1.5rem;
+      line-height: 1.5;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .lookup {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .lookup input {
+      width: 12rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1rem;
+    }
+    .lookup input::placeholder { color: var(--muted); }
+    .lookup input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .lookup button {
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .lookup button:hover { filter: brightness(1.1); }
+    .lookup button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .message {
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+    .message.info { background: rgba(167, 139, 250, 0.15); border: 1px solid var(--accent); }
+    .message.error { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; }
+    .message.empty { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem 0;
+      color: var(--accent);
+    }
+    .result-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .result-row .label { color: var(--muted); min-width: 6rem; }
+    .result-row .value { font-weight: 500; }
+    .result-row .value.stage { color: var(--success); }
+    .reason { font-size: 0.85rem; color: var(--muted); margin-left: 6.5rem; margin-top: 0.25rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    .deal-view ul { margin: 0; padding-left: 1.25rem; }
+    .deal-view li { margin: 0.25rem 0; }
+    .deal-view .key { color: var(--accent); }
+    .muted { color: var(--muted); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stage / Substage Lookup</h1>
+    <p class="subtitle">Look up a user by Blackbaud user_id to see checklist data and how deal stage and substage are calculated.</p>
+
+    <div class="lookup">
+      <input type="number" id="userId" placeholder="user_id (Blackbaud ID)" min="1" step="1">
+      <button type="button" id="btnLookup">Look up</button>
+    </div>
+
+    <div id="message" class="message hidden"></div>
+    <div id="content" class="hidden">
+      <section id="sectionResult">
+        <h2>Result</h2>
+        <div id="resultBody"></div>
+      </section>
+      <section id="sectionBreakdown">
+        <h2>Calculation breakdown</h2>
+        <div id="breakdownBody"></div>
+      </section>
+      <section id="sectionDealView">
+        <h2>Aggregated deal view</h2>
+        <div id="dealViewBody" class="deal-view"></div>
+      </section>
+      <section id="sectionTable">
+        <h2>Checklist rows</h2>
+        <div style="overflow-x: auto;">
+          <table id="tableRows">
+            <thead><tr id="tableHead"></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const userIdInput = document.getElementById('userId');
+    const btnLookup = document.getElementById('btnLookup');
+    const messageEl = document.getElementById('message');
+    const contentEl = document.getElementById('content');
+    const resultBody = document.getElementById('resultBody');
+    const breakdownBody = document.getElementById('breakdownBody');
+    const dealViewBody = document.getElementById('dealViewBody');
+    const tableHead = document.getElementById('tableHead');
+    const tableBody = document.getElementById('tableBody');
+
+    function showMessage(text, type) {
+      messageEl.textContent = text;
+      messageEl.className = 'message ' + (type || 'info');
+      messageEl.classList.remove('hidden');
+    }
+
+    function hideMessage() {
+      messageEl.classList.add('hidden');
+    }
+
+    function renderResult(data) {
+      const b = data.breakdown;
+      const name = [data.firstName, data.lastName].filter(Boolean).join(' ') || '—';
+      let html = '<div class="result-row"><span class="label">User</span><span class="value">' + escapeHtml(data.userId) + (name !== '—' ? ' (' + escapeHtml(name) + ')' : '') + '</div>';
+      if (data.checklistTable) html += '<div class="result-row"><span class="label">Data source</span><span class="value muted">' + escapeHtml(data.checklistTable) + '</span></div>';
+      if (b) {
+        html += '<div class="result-row"><span class="label">Deal stage</span><span class="value stage">' + escapeHtml(b.stage ?? '—') + '</span></div>';
+        if (b.stageReason) html += '<div class="reason">' + escapeHtml(b.stageReason) + '</div>';
+        html += '<div class="result-row"><span class="label">Substage</span><span class="value">' + (b.substage != null ? b.substage + (b.substageLabel ? ' – ' + escapeHtml(b.substageLabel) : '') : '—') + '</span></div>';
+        if (b.substageReason) html += '<div class="reason">' + escapeHtml(b.substageReason) + '</div>';
+      } else {
+        html += '<div class="result-row"><span class="label">Deal stage</span><span class="value">—</span></div>';
+        html += '<div class="result-row"><span class="label">Substage</span><span class="value">—</span></div>';
+      }
+      resultBody.innerHTML = html;
+    }
+
+    function renderBreakdown(data) {
+      const b = data.breakdown;
+      if (!b) {
+        breakdownBody.innerHTML = '<p class="muted">No breakdown (no checklist data).</p>';
+        return;
+      }
+      let html = '<p><strong>Stage</strong>: ' + escapeHtml(b.stage ?? 'null') + '</p>';
+      if (b.stageReason) html += '<p><strong>Reason</strong>: ' + escapeHtml(b.stageReason) + '</p>';
+      html += '<p><strong>Substage</strong>: ' + (b.substage != null ? b.substage + ' – ' + escapeHtml(b.substageLabel ?? '') : 'null') + '</p>';
+      if (b.substageReason) html += '<p><strong>Reason</strong>: ' + escapeHtml(b.substageReason) + '</p>';
+      breakdownBody.innerHTML = html;
+    }
+
+    function renderDealView(data) {
+      const d = data.dealView;
+      if (!d) {
+        dealViewBody.innerHTML = '<p class="muted">No aggregated view.</p>';
+        return;
+      }
+      let html = '<ul>';
+      html += '<li><span class="key">checklistsCompleted</span>: ' + escapeHtml(JSON.stringify(d.checklistsCompleted)) + '</li>';
+      html += '<li><span class="key">itemStatus</span>: ' + escapeHtml(JSON.stringify(d.itemStatus)) + '</li>';
+      html += '<li><span class="key">testNoShow</span>: ' + d.testNoShow + '</li>';
+      html += '<li><span class="key">testShortDescription</span>: ' + escapeHtml(d.testShortDescription ?? 'null') + '</li>';
+      html += '<li><span class="key">candidate_decision</span>: ' + escapeHtml(d.candidate_decision ?? 'null') + '</li>';
+      html += '<li><span class="key">school_decision</span>: ' + escapeHtml(d.school_decision ?? 'null') + '</li>';
+      html += '<li><span class="key">inactive</span>: ' + d.inactive + '</li>';
+      html += '<li><span class="key">contract_publish_date</span>: ' + escapeHtml(d.contract_publish_date ?? 'null') + '</li>';
+      html += '<li><span class="key">contract_return_date</span>: ' + escapeHtml(d.contract_return_date ?? 'null') + '</li>';
+      html += '<li><span class="key">contract_dep_rec_date</span>: ' + escapeHtml(d.contract_dep_rec_date ?? 'null') + '</li>';
+      html += '</ul>';
+      dealViewBody.innerHTML = html;
+    }
+
+    function renderTable(rows) {
+      if (!rows || rows.length === 0) {
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '<tr><td colspan="10">No rows</td></tr>';
+        return;
+      }
+      const keys = Object.keys(rows[0]);
+      tableHead.innerHTML = keys.map(k => '<th>' + escapeHtml(k) + '</th>').join('');
+      tableBody.innerHTML = rows.map(row =>
+        '<tr>' + keys.map(k => '<td>' + escapeHtml(row[k] != null ? String(row[k]) : '') + '</td>').join('') + '</tr>'
+      ).join('');
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function doLookup() {
+      const raw = userIdInput.value.trim();
+      if (!raw) {
+        showMessage('Enter a user_id.', 'info');
+        return;
+      }
+      btnLookup.disabled = true;
+      hideMessage();
+      contentEl.classList.add('hidden');
+      try {
+        const res = await fetch('/api/user/' + encodeURIComponent(raw));
+        const data = await res.json();
+        if (!res.ok) {
+          showMessage(data.error || 'Request failed', 'error');
+          return;
+        }
+        if (data.message && !data.dealView) {
+          showMessage(data.message, 'empty');
+          contentEl.classList.remove('hidden');
+          resultBody.innerHTML = '<p>User ' + escapeHtml(data.userId) + ': no checklist data.</p>';
+          breakdownBody.innerHTML = '';
+          dealViewBody.innerHTML = '';
+          renderTable([]);
+        } else {
+          contentEl.classList.remove('hidden');
+          renderResult(data);
+          renderBreakdown(data);
+          renderDealView(data);
+          renderTable(data.checklistRows || []);
+        }
+      } catch (e) {
+        showMessage('Network error: ' + e.message, 'error');
+      } finally {
+        btnLookup.disabled = false;
+      }
+    }
+
+    btnLookup.addEventListener('click', doLookup);
+    userIdInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doLookup(); });
+  </script>
+</body>
+</html>
