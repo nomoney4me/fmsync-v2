@@ -1,6 +1,6 @@
 # HubSpot setup for FM Sync
 
-What you need from HubSpot to run the HubSpot poller and the full sync flow (fetch deals → compute stage/substage → queue → POST to HubSpot).
+What you need from HubSpot to run the HubSpot poller and the full sync flow (fetch deals → compute stage/substage → queue → POST to HubSpot). The poller uses the Search API and only fetches deals that have a value for the Blackbaud user id property, sorted by last modified date (newest first). You can optionally limit to deals modified after a given time via `HUBSPOT_MODIFIED_AFTER`.
 
 ---
 
@@ -54,7 +54,7 @@ Deals must be linkable to Blackbaud checklist data by **user_id**.
 
 | Goal | Component | Status |
 |------|-----------|--------|
-| **1. Fetch HubSpot deals every N minutes** | **HubSpot poller** (`packages/hubspot-poller`) | ✅ Implemented. Uses `HUBSPOT_POLL_CRON` (default: every 1 min dev, 15 min prod). Fetches deals and upserts into `hubspot_deals`. |
+| **1. Fetch HubSpot deals every N minutes** | **HubSpot poller** (`packages/hubspot-poller`) | ✅ Implemented. Uses `HUBSPOT_POLL_CRON` or `HUBSPOT_POLL_CRON_DEV` / `HUBSPOT_POLL_CRON_PROD` (default: every 5 min for both). Fetches deals and upserts into `hubspot_deals`. |
 | **2. When logic is processed, insert (user_id, deal_id, stage, substage) into queue** | **Processor** (`packages/processor`) + **DB queue** | 🔲 Processor is still a stub. Needs to: join `hubspot_deals` ↔ checklist data by `blackbaud_user_id` = `user_id`, run stage/substage logic (`checklist-stages.ts`), compare to current deal; if different → insert into `hubspot_update_queue` (deal_id + payload with new dealstage/substage). |
 | **3. POST to HubSpot and remove from queue** | **HubSpot worker** (consumer) | 🔲 Not implemented. Should: read `hubspot_update_queue` (status = pending), PATCH deal in HubSpot with `payload_json`, then mark row success (or failed/retry) and remove or update status. |
 
@@ -77,7 +77,10 @@ So “insert into the queue” = insert a row with `deal_id`, `payload_json` (st
 |----------|----------|-------------|
 | `HUBSPOT_ACCESS_TOKEN` | Yes | Private app (or OAuth) access token. |
 | `HUBSPOT_DEAL_PROPERTY_BLACKBAUD_ID` | No | Default `blackbaud_user_id`. Deal property that stores Blackbaud user_id. |
-| `HUBSPOT_POLL_CRON` | No | Cron for fetching deals (default: `*/1` dev, `*/15` prod). |
+| `HUBSPOT_POLL_CRON` | No | Cron for fetching deals; overrides both dev and prod. |
+| `HUBSPOT_POLL_CRON_DEV` | No | Cron in non-production (default: `*/5` = every 5 min). |
+| `HUBSPOT_POLL_CRON_PROD` | No | Cron in production (default: `*/5` = every 5 min). |
+| `HUBSPOT_MODIFIED_AFTER` | No | Only fetch deals modified on or after this time (Unix ms). Omit to fetch all. |
 | `DATABASE_URL` | Yes | Postgres connection string (for `hubspot_deals` and `hubspot_update_queue`). |
 
 ---

@@ -13,12 +13,16 @@ import cron from 'node-cron';
 import { Client } from '@hubspot/api-client';
 import { Pool } from 'pg';
 import { createLogger } from '@fm-sync/shared';
+import { fetchDealsSearch } from './fetch-deals';
 
 const log = createLogger('hubspot-poller', 'hs');
 
+// Separate defaults for dev vs prod so they can be overridden independently (e.g. HUBSPOT_POLL_CRON_DEV / HUBSPOT_POLL_CRON_PROD)
+const POLL_CRON_DEV = process.env.HUBSPOT_POLL_CRON_DEV || '*/5 * * * *';
+const POLL_CRON_PROD = process.env.HUBSPOT_POLL_CRON_PROD || '*/5 * * * *';
 const POLL_CRON =
   process.env.HUBSPOT_POLL_CRON ||
-  (process.env.NODE_ENV === 'production' ? '*/15 * * * *' : '*/1 * * * *');
+  (process.env.NODE_ENV === 'production' ? POLL_CRON_PROD : POLL_CRON_DEV);
 const BLACKBAUD_PROP = process.env.HUBSPOT_DEAL_PROPERTY_BLACKBAUD_ID || 'blackbaud_user_id';
 
 const STATUS_DIR = path.resolve(__dirname, '../../../status');
@@ -26,18 +30,6 @@ const RUNNING_FILE =
   process.env.HUBSPOT_RUNNING_FILE || path.join(STATUS_DIR, 'hubspot-poller.running');
 const RUNNING_STALE_MS =
   (parseInt(process.env.HUBSPOT_RUNNING_STALE_HOURS || '1', 10) || 1) * 60 * 60 * 1000;
-
-const DEAL_PROPERTIES = [
-  BLACKBAUD_PROP,
-  'createdate',
-  'deal_substage_new',
-  'dealname',
-  'dealstage',
-  'hs_lastmodifieddate',
-  'hs_object_id',
-  'isp_entry_year',
-  'pipeline',
-];
 
 const BATCH_SIZE = 100;
 
@@ -123,7 +115,15 @@ async function poll(): Promise<void> {
 
   try {
     const client = new Client({ accessToken: token });
-    const allDeals = await client.crm.deals.getAll(100, undefined, DEAL_PROPERTIES);
+    const modifiedAfter = process.env.HUBSPOT_MODIFIED_AFTER
+      ? parseInt(process.env.HUBSPOT_MODIFIED_AFTER, 10)
+      : undefined;
+    const allDeals = await fetchDealsSearch(client, {
+      accessToken: token,
+      blackbaudProperty: BLACKBAUD_PROP,
+      limit: 100,
+      modifiedAfter: Number.isFinite(modifiedAfter) ? modifiedAfter : undefined,
+    });
 
     if (allDeals.length === 0) {
       await pool.query(
@@ -134,9 +134,7 @@ async function poll(): Promise<void> {
       return;
     }
 
-    const records: DealRecord[] = (allDeals as { id: string; properties?: Record<string, string> }[]).map(
-      (r) => parseDeal(r)
-    );
+    const records: DealRecord[] = allDeals.map((r) => parseDeal(r));
 
     const db = await pool.connect();
     let upserted = 0;
@@ -148,7 +146,7 @@ async function poll(): Promise<void> {
         let param = 1;
         for (const row of batch) {
           placeholders.push(
-            `($${param},$${param + 1},$${param + 2},$${param + 3},$${param + 4},$${param + 5},$${param + 6},$${param + 7},$${param + 8},$${param + 9},$${param + 10},NOW())`
+            `($${param},$${param + 1},$${param + 2},$${param + 3},$${param + 4},$${param + 5},$${param + 6},$${param + 7},$${param + 8},$${param + 9},NOW())`
           );
           values.push(
             row.deal_id,
@@ -162,7 +160,7 @@ async function poll(): Promise<void> {
             row.isp_entry_year,
             row.pipeline
           );
-          param += 11;
+          param += 10;
         }
 
         await db.query(

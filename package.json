@@ -19,10 +19,14 @@
     "dev:processor": "npm run dev -w @fm-sync/processor",
     "dev:worker": "npm run dev -w @fm-sync/hubspot-worker",
     "dev:frontend": "npm run dev -w @fm-sync/frontend",
-    "test:fetch-page": "npx tsx packages/blackbaud-poller/test/fetch-page.ts","test:fetch-candidate": "npx tsx packages/blackbaud-poller/test/fetch-candidate-checklist.ts",
-    "test:fetch-candidates": "npm run test:fetch-candidates -w @fm-sync/blackbaud-poller"
+    "test:fetch-page": "npx tsx packages/blackbaud-poller/test/fetch-page.ts",
+    "test:fetch-candidate": "npx tsx packages/blackbaud-poller/test/fetch-candidate-checklist.ts",
+    "test:fetch-candidates": "npm run test:fetch-candidates -w @fm-sync/blackbaud-poller",
+    "test:fetch-deals": "npm run test:fetch-deals -w @fm-sync/hubspot-poller",
+    "test:fetch-deals-api": "npm run test:fetch-deals-api -w @fm-sync/hubspot-poller"
   },
   "dependencies": {
+    "@hubspot/api-client": "^13.4.0",
     "node-cron": "^4.2.1"
   }
 }

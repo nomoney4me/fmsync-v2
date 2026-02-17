@@ -57,10 +57,12 @@ const RUNNING_FILE =
 const RUNNING_STALE_MS =
   (parseInt(process.env.BB_RUNNING_STALE_HOURS || '1', 10) || 1) * 60 * 60 * 1000;
 
-// Every 1 min in dev (or when NODE_ENV not production), 15 min in prod. Override with BLACKBAUD_POLL_CRON
+// Separate defaults for dev vs prod so they can be overridden independently (e.g. BLACKBAUD_POLL_CRON_DEV / BLACKBAUD_POLL_CRON_PROD)
+const POLL_CRON_DEV = process.env.BLACKBAUD_POLL_CRON_DEV || '*/5 * * * *';
+const POLL_CRON_PROD = process.env.BLACKBAUD_POLL_CRON_PROD || '*/5 * * * *';
 const POLL_CRON =
   process.env.BLACKBAUD_POLL_CRON ||
-  (process.env.NODE_ENV === 'production' ? '*/15 * * * *' : '*/1 * * * *');
+  (process.env.NODE_ENV === 'production' ? POLL_CRON_PROD : POLL_CRON_DEV);
 
 // When set (e.g. for system cron), run poll once and exit. Prevents multiple processes and memory growth.
 const RUN_ONCE = process.env.RUN_ONCE === '1' || process.env.RUN_ONCE === 'true';

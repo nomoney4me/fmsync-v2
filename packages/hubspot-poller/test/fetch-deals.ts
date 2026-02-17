@@ -4,26 +4,19 @@
  */
 import { config as loadEnv } from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
-loadEnv({ path: path.resolve(process.cwd(), '.env') });
+const rootEnv = path.resolve(process.cwd(), '../../.env');
+const cwdEnv = path.resolve(process.cwd(), '.env');
+loadEnv({ path: fs.existsSync(rootEnv) ? rootEnv : cwdEnv });
 
 import { Client } from '@hubspot/api-client';
 import { Pool } from 'pg';
 import { createLogger } from '@fm-sync/shared';
+import { fetchDealsSearch } from '../src/fetch-deals';
 
 const log = createLogger('hubspot-poller-test', 'hs');
 const BLACKBAUD_PROP = process.env.HUBSPOT_DEAL_PROPERTY_BLACKBAUD_ID || 'blackbaud_user_id';
-const DEAL_PROPERTIES = [
-  BLACKBAUD_PROP,
-  'createdate',
-  'deal_substage_new',
-  'dealname',
-  'dealstage',
-  'hs_lastmodifieddate',
-  'hs_object_id',
-  'isp_entry_year',
-  'pipeline',
-];
 
 async function main() {
   const token = process.env.HUBSPOT_ACCESS_TOKEN;
@@ -36,8 +29,12 @@ async function main() {
   const client = new Client({ accessToken: token });
 
   try {
-    log.info('Fetching deals from HubSpot...');
-    const allDeals = await client.crm.deals.getAll(100, undefined, DEAL_PROPERTIES);
+    log.info('Fetching deals from HubSpot (with blackbaud_id, sort by modified desc)...');
+    const allDeals = await fetchDealsSearch(client, {
+      accessToken: token,
+      blackbaudProperty: BLACKBAUD_PROP,
+      limit: 100,
+    });
     log.info({ count: allDeals.length }, 'Fetched deals');
 
     if (allDeals.length === 0) {
@@ -49,7 +46,7 @@ async function main() {
     try {
       let upserted = 0;
       const BATCH_SIZE = 100;
-      const deals = allDeals as { id: string; properties?: Record<string, string> }[];
+      const deals = allDeals;
 
       for (let i = 0; i < deals.length; i += BATCH_SIZE) {
         const batch = deals.slice(i, i + BATCH_SIZE);
