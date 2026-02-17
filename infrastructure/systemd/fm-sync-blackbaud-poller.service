@@ -14,7 +14,8 @@ After=network.target postgresql.service
 Type=simple
 WorkingDirectory=/opt/fm-sync
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node packages/blackbaud-poller/dist/index.js
+# Use /usr/local/bin/node so a symlink from your real node path works (e.g. nvm)
+ExecStart=/usr/local/bin/node packages/blackbaud-poller/dist/index.js
 Restart=on-failure
 RestartSec=30
 
