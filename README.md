@@ -168,6 +168,17 @@ sudo systemctl stop fm-sync-hubspot-poller fm-sync-blackbaud-poller
 
 The units are enabled for boot, so both pollers start automatically after a reboot.
 
+**Optional: stages test server (port 3002)**  
+To run the stage/substage test UI (look up a user by Blackbaud ID, see checklist + calculation):
+
+```bash
+sudo cp infrastructure/systemd/fm-sync-stages-test.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now fm-sync-stages-test
+```
+
+Requires `npm install` at repo root (so `npx tsx` works). Open `http://<your-server>:3002` in a browser. Port can be changed with `Environment=STAGES_TEST_PORT=3002` in the unit or in `.env` as `STAGES_TEST_PORT`.
+
 ### 5. Poll schedule
 
 In production, pollers use the **prod** cron (default every 5 minutes). Override with env vars:

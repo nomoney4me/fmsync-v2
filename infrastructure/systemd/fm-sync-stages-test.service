@@ -1,0 +1,27 @@
+# Stages test server (port 3002) – lookup user by Blackbaud ID, see checklist + stage/substage.
+# Optional: only enable if you need this UI in production.
+# Copy to /etc/systemd/system/ and edit paths if your app is not in /opt/fm-sync.
+#
+#   sudo cp infrastructure/systemd/fm-sync-stages-test.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fm-sync-stages-test
+
+[Unit]
+Description=FM Sync stages test server (port 3002)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fm-sync
+Environment=NODE_ENV=production
+Environment=STAGES_TEST_PORT=3002
+ExecStart=/usr/bin/npx tsx packages/processor/src/stages-test-server.ts
+Restart=on-failure
+RestartSec=30
+
+# Run as unprivileged user if desired
+# User=fm-sync
+# Group=fm-sync
+
+[Install]
+WantedBy=multi-user.target
