@@ -92,3 +92,87 @@ fm-sync-final/
 - **Phase 5** Polish (manual retry, alerts)
 
 See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for full architecture.
+
+---
+
+## Moving from dev to production
+
+### 1. Environment
+
+- Set **`NODE_ENV=production`** (the systemd units set this).
+- Use a production **`.env`** in the app directory (or configure env vars for the service). The units use `WorkingDirectory` so the app loads `.env` from that directory.
+- Ensure **Blackbaud** refresh token is available in production (e.g. copy `.blackbaud-tokens.json` or re-run OAuth once on the prod server with prod app credentials).
+- See [docs/HUBSPOT_SETUP.md](./docs/HUBSPOT_SETUP.md) for HubSpot token and deal/contact property setup.
+
+### 2. Database
+
+- Production Postgres must be running and reachable.
+- Run migrations if you have any beyond the init scripts:
+  ```bash
+  npm run db:migrate
+  ```
+- For an existing DB that didn’t get the diff migration:
+  ```bash
+  psql $DATABASE_URL -f infrastructure/db/init/02-checklist-diff.sql
+  ```
+
+### 3. Build
+
+From the repo root, build in dependency order so `dist/` is up to date:
+
+```bash
+# Required first: shared (used by pollers)
+npm run build -w @fm-sync/shared
+
+# Then the pollers (required for systemd)
+npm run build -w @fm-sync/hubspot-poller
+npm run build -w @fm-sync/blackbaud-poller
+```
+
+### 4. Run with systemd
+
+The project uses **systemd** (not PM2) so it runs well on resource-limited VMs. Unit files are in `infrastructure/systemd/`.
+
+**Install the units** (edit paths if your app is not in `/opt/fm-sync`):
+
+```bash
+sudo cp infrastructure/systemd/fm-sync-hubspot-poller.service /etc/systemd/system/
+sudo cp infrastructure/systemd/fm-sync-blackbaud-poller.service /etc/systemd/system/
+```
+
+Edit each unit if needed (e.g. `WorkingDirectory` and `ExecStart` path, or `User`/`Group`):
+
+```bash
+sudo systemctl edit --full fm-sync-hubspot-poller
+sudo systemctl edit --full fm-sync-blackbaud-poller
+```
+
+**Enable and start:**
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable fm-sync-hubspot-poller fm-sync-blackbaud-poller
+sudo systemctl start fm-sync-hubspot-poller fm-sync-blackbaud-poller
+```
+
+**Useful commands:**
+
+```bash
+sudo systemctl status fm-sync-hubspot-poller
+sudo systemctl status fm-sync-blackbaud-poller
+journalctl -u fm-sync-hubspot-poller -f
+journalctl -u fm-sync-blackbaud-poller -f
+sudo systemctl restart fm-sync-hubspot-poller
+sudo systemctl stop fm-sync-hubspot-poller fm-sync-blackbaud-poller
+```
+
+The units are enabled for boot, so both pollers start automatically after a reboot.
+
+### 5. Poll schedule
+
+In production, pollers use the **prod** cron (default every 5 minutes). Override with env vars:
+
+- **HubSpot:** `HUBSPOT_POLL_CRON`, or `HUBSPOT_POLL_CRON_PROD` / `HUBSPOT_POLL_CRON_DEV`
+- **Blackbaud:** `BLACKBAUD_POLL_CRON`, or `BLACKBAUD_POLL_CRON_PROD` / `BLACKBAUD_POLL_CRON_DEV`
+
+Example: `HUBSPOT_POLL_CRON_PROD='*/15 * * * *'` for every 15 minutes in production only.

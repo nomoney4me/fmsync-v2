@@ -1,0 +1,26 @@
+# HubSpot deals poller – systemd unit
+# Copy to /etc/systemd/system/ and edit paths if your app is not in /opt/fm-sync.
+#
+#   sudo cp infrastructure/systemd/fm-sync-hubspot-poller.service /etc/systemd/system/
+#   sudo systemctl edit --full fm-sync-hubspot-poller  # set WorkingDirectory and ExecStart
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fm-sync-hubspot-poller
+
+[Unit]
+Description=FM Sync HubSpot poller
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fm-sync
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node packages/hubspot-poller/dist/index.js
+Restart=on-failure
+RestartSec=30
+
+# Run as unprivileged user (create if needed: useradd -r -s /bin/false fm-sync)
+# User=fm-sync
+# Group=fm-sync
+
+[Install]
+WantedBy=multi-user.target

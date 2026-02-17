@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node dist/index.js",
+    "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "test:fetch-deals": "tsx test/fetch-deals.ts",
     "test:fetch-deals-api": "tsx test/fetch-deals-api-only.ts"
