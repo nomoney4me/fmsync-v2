@@ -13,9 +13,11 @@ After=network.target postgresql.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/fm-sync
+# So systemd finds node (tsx uses env node). Add your node bin path if you use nvm: e.g. /home/YOU/.nvm/versions/node/v20.x.x/bin
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
 Environment=STAGES_TEST_PORT=3002
-ExecStart=/usr/bin/npx tsx packages/processor/src/stages-test-server.ts
+ExecStart=node_modules/.bin/tsx packages/processor/src/stages-test-server.ts
 Restart=on-failure
 RestartSec=30
 
