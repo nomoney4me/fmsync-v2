@@ -49,7 +49,7 @@ async function sleep(ms: number): Promise<void> {
  * Sorts by last modified descending in memory (Search API sorts can cause 400).
  */
 export async function fetchDealsSearch(
-  _client: { accessToken?: string },
+  _client: unknown,
   options: FetchDealsOptions
 ): Promise<DealResult[]> {
   const { accessToken, blackbaudProperty, limit = 100, modifiedAfter } = options;
@@ -77,7 +77,11 @@ export async function fetchDealsSearch(
     return body;
   };
 
-  const token = accessToken || (_client as { accessToken?: string }).accessToken;
+  const token =
+    accessToken ||
+    (typeof _client === 'object' && _client !== null && 'accessToken' in _client
+      ? (_client as { accessToken?: string }).accessToken
+      : undefined);
   if (!token) {
     throw new Error('fetchDealsSearch requires accessToken in options or on client');
   }
