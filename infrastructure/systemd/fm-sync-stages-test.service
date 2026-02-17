@@ -17,7 +17,8 @@ WorkingDirectory=/opt/fm-sync
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
 Environment=STAGES_TEST_PORT=3002
-ExecStart=node_modules/.bin/tsx packages/processor/src/stages-test-server.ts
+# Absolute path required by systemd. If you symlink /opt/fm-sync -> your repo, this works.
+ExecStart=/opt/fm-sync/node_modules/.bin/tsx packages/processor/src/stages-test-server.ts
 Restart=on-failure
 RestartSec=30
 
